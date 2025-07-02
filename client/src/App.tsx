@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
+import PortfolioPredict from "./pages/PortfolioPredict";
 import Home from "./pages/Home";
 import Navbar from "./components/Navbar";
 import ContactUs from "./pages/ContectUs";
@@ -40,6 +40,7 @@ function App() {
           />
           <Route path="/company/:companyName" element={<CompanyProfile />} />
           <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/portfolio-predict" element={<PortfolioPredict />} />
         </Routes>
         <GeminiChatbot apiKey="AIzaSyBvX1pXSK0h3ZANvyzeyNsje9FHSHFXp2U" />
         <Footer />

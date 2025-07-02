@@ -129,6 +129,162 @@ const Navbar = () => {
           </Link>
         </div>
 
+        {/* Search Bar/Icon - right aligned for mobile/tablet, inline for desktop */}
+        <div className="flex-1 flex justify-end lg:justify-center">
+          <div className="relative flex items-center" ref={searchRef}>
+            {/* Mobile/Tablet Search Icon - only show if not open and below lg */}
+            {!isSearchOpen && (
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="block lg:hidden text-gray-400 hover:text-white transition-colors ml-auto"
+              >
+                <Search size={20} />
+              </button>
+            )}
+
+            {/* Desktop Search Input */}
+            <div className="hidden lg:block">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search stocks..."
+                  className={`w-96 bg-[#1E222D] text-gray-300 px-4 py-2 pl-10 pr-10 rounded-lg border focus:outline-none transition-all duration-200 ${
+                    isSearching
+                      ? "border-blue-500/50 bg-gradient-to-r from-[#1E222D] via-[#262932] to-[#1E222D] bg-[length:200%_100%]"
+                      : "border-gray-700 focus:border-blue-500"
+                  }`}
+                  style={
+                    isSearching
+                      ? {
+                          animation:
+                            "searchBarLoading 1.5s ease-in-out infinite",
+                        }
+                      : {}
+                  }
+                />
+                <Search
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors duration-200 ${
+                    isSearching ? "text-blue-500" : "text-gray-400"
+                  }`}
+                  size={18}
+                />
+                {/* Search Results Dropdown */}
+                {showResults && Object.keys(searchResults).length > 0 && (
+                  <div
+                    className={`absolute w-full mt-2 bg-[#1E222D] border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto transition-all duration-200 ${
+                      isSearching
+                        ? "opacity-60 translate-y-1"
+                        : "opacity-100 translate-y-0"
+                    }`}
+                  >
+                    {isSearching && (
+                      <div className="flex justify-center items-center py-4">
+                        <span className="loader mr-2"></span>
+                        <span className="text-gray-400">Loading...</span>
+                      </div>
+                    )}
+                    {!isSearching &&
+                      Object.entries(searchResults).map(([symbol, name]) => (
+                        <div
+                          key={symbol}
+                          onClick={() => {
+                            navigate(`/stock/${symbol}`);
+                            setSearchQuery("");
+                            setShowResults(false);
+                            setIsSearchOpen(false);
+                          }}
+                          className="px-4 py-3 hover:bg-[#262932] cursor-pointer border-b border-gray-700 last:border-0"
+                        >
+                          <div className="text-white font-medium">{symbol}</div>
+                          <div className="text-gray-400 text-sm">{name}</div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Search Overlay - only show when open */}
+            {isSearchOpen && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+                <div className="w-full max-w-md mx-auto p-4 bg-[#131722] rounded-lg shadow-lg relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search stocks..."
+                      className={`w-full bg-[#1E222D] text-gray-300 px-4 py-2 pl-10 pr-10 rounded-lg border focus:outline-none transition-all duration-200 ${
+                        isSearching
+                          ? "border-blue-500/50 bg-gradient-to-r from-[#1E222D] via-[#262932] to-[#1E222D] bg-[length:200%_100%]"
+                          : "border-gray-700 focus:border-blue-500"
+                      }`}
+                      style={
+                        isSearching
+                          ? {
+                              animation:
+                                "searchBarLoading 1.5s ease-in-out infinite",
+                            }
+                          : {}
+                      }
+                      autoFocus
+                    />
+                    <Search
+                      className={`absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors duration-200 ${
+                        isSearching ? "text-blue-500" : "text-gray-400"
+                      }`}
+                      size={18}
+                    />
+                    <button
+                      onClick={handleSearchClose}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  {/* Search Results Dropdown */}
+                  {showResults && Object.keys(searchResults).length > 0 && (
+                    <div
+                      className={`absolute w-full mt-2 bg-[#1E222D] border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto transition-all duration-200 ${
+                        isSearching
+                          ? "opacity-60 translate-y-1"
+                          : "opacity-100 translate-y-0"
+                      }`}
+                    >
+                      {isSearching && (
+                        <div className="flex justify-center items-center py-4">
+                          <span className="loader mr-2"></span>
+                          <span className="text-gray-400">Loading...</span>
+                        </div>
+                      )}
+                      {!isSearching &&
+                        Object.entries(searchResults).map(([symbol, name]) => (
+                          <div
+                            key={symbol}
+                            onClick={() => {
+                              navigate(`/stock/${symbol}`);
+                              setSearchQuery("");
+                              setShowResults(false);
+                              setIsSearchOpen(false);
+                            }}
+                            className="px-4 py-3 hover:bg-[#262932] cursor-pointer border-b border-gray-700 last:border-0"
+                          >
+                            <div className="text-white font-medium">
+                              {symbol}
+                            </div>
+                            <div className="text-gray-400 text-sm">{name}</div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Navigation Links */}
         <div className="hidden lg:flex space-x-8">
           <Link
@@ -155,97 +311,12 @@ const Navbar = () => {
           >
             Contact Us
           </Link>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative" ref={searchRef}>
-          {/* Mobile Search Icon */}
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="lg:hidden text-gray-400 hover:text-white transition-colors"
+          <Link
+            to="/portfolio-predict"
+            className="text-gray-300 hover:text-white transition-colors duration-300"
           >
-            <Search size={20} />
-          </button>
-
-          {/* Search Input - Desktop & Mobile Overlay */}
-          <div
-            className={`${
-              isSearchOpen
-                ? "fixed inset-0 bg-black/50 lg:relative lg:bg-transparent"
-                : "hidden lg:block"
-            }`}
-          >
-            <div
-              className={`${
-                isSearchOpen
-                  ? "absolute top-0 left-0 right-0 p-4 bg-[#131722] lg:relative lg:p-0"
-                  : "relative"
-              }`}
-            >
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search stocks..."
-                  className={`w-full lg:w-96 bg-[#1E222D] text-gray-300 px-4 py-2 pl-10 pr-10 rounded-lg border focus:outline-none transition-all duration-200 ${
-                    isSearching
-                      ? "border-blue-500/50 bg-gradient-to-r from-[#1E222D] via-[#262932] to-[#1E222D] bg-[length:200%_100%]"
-                      : "border-gray-700 focus:border-blue-500"
-                  }`}
-                  style={
-                    isSearching
-                      ? {
-                          animation:
-                            "searchBarLoading 1.5s ease-in-out infinite",
-                        }
-                      : {}
-                  }
-                />
-                <Search
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors duration-200 ${
-                    isSearching ? "text-blue-500" : "text-gray-400"
-                  }`}
-                  size={18}
-                />
-                {isSearchOpen && (
-                  <button
-                    onClick={handleSearchClose}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white lg:hidden"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
-
-              {/* Search Results Dropdown */}
-              {showResults && Object.keys(searchResults).length > 0 && (
-                <div
-                  className={`absolute w-full mt-2 bg-[#1E222D] border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto transition-all duration-200 ${
-                    isSearching
-                      ? "opacity-60 translate-y-1"
-                      : "opacity-100 translate-y-0"
-                  }`}
-                >
-                  {Object.entries(searchResults).map(([symbol, name]) => (
-                    <div
-                      key={symbol}
-                      onClick={() => {
-                        navigate(`/stock/${symbol}`);
-                        setSearchQuery("");
-                        setShowResults(false);
-                        setIsSearchOpen(false);
-                      }}
-                      className="px-4 py-3 hover:bg-[#262932] cursor-pointer border-b border-gray-700 last:border-0"
-                    >
-                      <div className="text-white font-medium">{symbol}</div>
-                      <div className="text-gray-400 text-sm">{name}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+            AI Portfolio
+          </Link>
         </div>
 
         {/* Right Side Navigation */}
@@ -352,27 +423,86 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="lg:hidden bg-[#1e222d] mt-4 p-4 rounded-lg">
+        <div className="lg:hidden bg-[#1e222d] mt-4 p-4 rounded-lg w-full absolute left-0 top-16 z-40">
           <div className="space-y-4">
             <Link
               to="/"
-              className="block text-gray-300 hover:text-white transition-colors duration-300"
+              className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Home
             </Link>
-
+            <Link
+              to="/marketplace"
+              className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Marketplace
+            </Link>
             <Link
               to="/news"
-              className="block text-gray-300 hover:text-white transition-colors duration-300"
+              className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               News
             </Link>
             <Link
               to="/contact"
-              className="block text-gray-300 hover:text-white transition-colors duration-300"
+              className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
-              ContactUs
+              Contact Us
             </Link>
+            <Link
+              to="/portfolio-predict"
+              className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              AI Portfolio
+            </Link>
+            {isLogin && (
+              <>
+                <Link
+                  to="/wallet"
+                  className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Wallet
+                </Link>
+                <Link
+                  to="/profile"
+                  className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Profile
+                </Link>
+                <Link
+                  to="/wallet"
+                  className="block text-gray-300 hover:text-white transition-colors duration-300 text-lg py-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Transactions
+                </Link>
+                <button
+                  className="w-full text-left text-red-400 hover:text-red-600 transition-colors duration-300 text-lg py-2"
+                  onClick={() => {
+                    handleLogout();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Logout
+                </button>
+              </>
+            )}
+            {!isLogin && (
+              <Link
+                to="/login/phone"
+                className="block text-blue-400 hover:text-blue-600 transition-colors duration-300 text-lg py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
       )}
