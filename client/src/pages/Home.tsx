@@ -11,7 +11,7 @@ import { searchStockData } from "../services/stockService";
 import { useNavigate } from "react-router-dom";
 import TopGainers from "../components/TopGainers";
 import { useTrade } from "../context/context";
-
+import  TradingViewIdeas  from "../components/TradingviewIdeas";
 const Home = () => {
   const [activeTab, setActiveTab] = useState("indices");
   const [searchTerm, setSearchTerm] = useState("");
@@ -392,6 +392,7 @@ const Home = () => {
         >
           <TopGainers></TopGainers>
         </motion.div>
+          <TradingViewIdeas></TradingViewIdeas>
       </div>
     </div>
   );

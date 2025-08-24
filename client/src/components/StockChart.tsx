@@ -157,7 +157,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, timeRange }) => {
 
       mainSeries.setData(lineData);
 
-      // Set up price formatting
+      // Set up price formatting - upstox
       chart.applyOptions({
         localization: {
           priceFormatter: (price: number) => {
