@@ -65,13 +65,6 @@ Make sure you have installed:
    git clone https://github.com/KushKK29/Trade_Shala.git
    cd Trade_Shala
 
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/rishvant/Trade-Shala
-   cd Trade-Shala
-   ```
-
 2. Install Frontend Dependencies:
    ```
    cd client
