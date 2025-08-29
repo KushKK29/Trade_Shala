@@ -50,7 +50,7 @@ server.listen(PORT, () => {
 
 setInterval(() => {
   https
-    .get(`https://trade-gpt.onrender.com`, (res) => {
+    .get(`https://trade-shala-yr1j.onrender.com`, (res) => {
       console.log("Pinging server to keep alive");
     })
     .on("error", (err) => {

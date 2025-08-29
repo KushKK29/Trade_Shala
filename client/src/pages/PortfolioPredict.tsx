@@ -63,22 +63,6 @@ const features = [
       />
     ),
   },
-  {
-    key: "portfolio-risk-classification",
-    title: "Portfolio Risk Classification",
-    description:
-      "Classify and analyze the risk profile of your portfolio using AI.",
-    iframe: (
-      <iframe
-        src="https://cuthberttt-riskclassification.hf.space"
-        frameBorder="0"
-        width="850"
-        height="450"
-        title="Portfolio Risk Classification"
-        className="w-full h-[450px]"
-      />
-    ),
-  },
 ];
 
 const PortfolioPredict: React.FC = () => {

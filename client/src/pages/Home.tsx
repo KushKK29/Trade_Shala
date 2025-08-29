@@ -326,6 +326,7 @@ const Home = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="bg-green-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors duration-300"
+            onClick={()=>{navigate('/signup')}}
           >
             Start Trading Now
           </motion.button>

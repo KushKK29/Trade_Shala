@@ -4,6 +4,8 @@ import twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { configDotenv } from "dotenv";
+import nodemailer from "nodemailer";
+
 configDotenv();
 
 // Twilio Configuration
@@ -41,6 +43,52 @@ const generateOTP = async (req, res) => {
     res.status(200).json({ message: "OTP sent successfully", otp: otp });
   } catch (error) {
     console.error("Error sending OTP:", error);
+    res.status(500).json({ message: "Failed to send OTP", error });
+  }
+};
+
+const generateEmailOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const expiresAt = new Date(Date.now() + 5 * 60000);
+
+    // Save or update OTP in database
+    await OTP.findOneAndUpdate(
+      { email },
+      { otp, expiresAt },
+      { upsert: true, new: true }
+    );
+
+    // Configure Nodemailer
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP Code",
+      text: `Your OTP code is: ${otp}. It will expire in 5 minutes.`,
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+
+    res
+      .status(200)
+      .json({ message: "OTP sent to email successfully", otp: otp }); // Remove `otp` in production
+  } catch (error) {
+    console.error("Error sending OTP via email:", error);
     res.status(500).json({ message: "Failed to send OTP", error });
   }
 };
@@ -146,4 +194,84 @@ const getUser = async (req, res) => {
   }
 };
 
-export { generateOTP, signup, login, verifyAndLogin, getUser };
+const googleSignup = async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    console.log("Google signup request body:", req.body);
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    let user = await User.findOne({ email });
+    console.log("User found:", user);
+    let isNew = false;
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        provider: "google",
+        password: "",
+      });
+      console.log("New user created:", user);
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+    res.status(isNew ? 201 : 200).json({
+      message: "Google signup/login successful",
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("Google signup error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+const googleLogin = async (req, res) => {
+  try {
+    const { email, name } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ message: "Email and name are required" });
+    }
+
+    let user = await User.findOne({ email });
+    let isNew = false;
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        provider: "google",
+        password: "", // Not used for Google
+      });
+      isNew = true;
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    return res.status(isNew ? 201 : 200).json({
+      message: isNew
+        ? "Signup successful via Google"
+        : "Login successful via Google",
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export {
+  generateOTP,
+  signup,
+  login,
+  verifyAndLogin,
+  getUser,
+  generateEmailOTP,
+  googleSignup,
+  googleLogin,
+};

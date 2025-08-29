@@ -1,16 +1,17 @@
 import OTP from "../models/Otp.Model.js"; // OTP schema to store OTPs
 
 const verifyOTP = async (req, res, next) => {
-  const { phoneNumber, otp } = req.body;
+  const { phoneNumber, email, otp } = req.body;
 
-  if (!phoneNumber || !otp) {
+  if ((!phoneNumber && !email) || !otp) {
     return res
       .status(400)
-      .json({ message: "Phone number and OTP are required" });
+      .json({ message: "Email or phone number and OTP are required" });
   }
 
   try {
-    const otpRecord = await OTP.findOne({ phoneNumber, otp });
+    const query = email ? { email, otp } : { phoneNumber, otp };
+    const otpRecord = await OTP.findOne(query);
 
     if (!otpRecord) {
       return res.status(400).json({ message: "Invalid OTP" });
