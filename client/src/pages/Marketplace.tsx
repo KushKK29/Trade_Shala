@@ -70,6 +70,7 @@ const Marketplace: React.FC = () => {
       const response = await fetchStrategy();
       setStrategies(response.data);
     } catch (err) {
+      console.log(err);
       setError("Failed to fetch strategies.");
     } finally {
       setLoading(false);
@@ -100,6 +101,7 @@ const Marketplace: React.FC = () => {
         fetchStrategies();
       }
     } catch (err) {
+      console.log("error while adding",err);
       setError("Failed to add strategy.");
     }
   };

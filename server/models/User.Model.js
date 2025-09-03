@@ -1,35 +1,41 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
-  {
+const userSchema = new mongoose.Schema({
     name: {
-      type: String,
-      required: true,
+        type: String,
+        required: true
     },
     email: {
-      type: String,
-      required: true,
-      unique: true,
+        type: String,
+        required: true,
+        unique: true
     },
     password: {
-      type: String,
-      required: true,
-    },
-    phoneNumber: {
-      type: String,
-    },
-    profilePicture: {
-      type: String,
-      required: false,
-    },
-    virtualBalance: {
-      type: Number,
-      default: 0,
+    type: String,
+    required: function () {
+      return this.provider === 'email'; // Required only for email signups
     },
   },
-  {
-    timestamps: true,
-  }
+    phoneNumber: {
+        type: String,
+    },
+    profilePicture: {
+        type: String,
+        required: false
+    },
+    virtualBalance: {
+        type: Number,
+        default: 0
+    },
+    provider: {
+        type: String,
+        enum: ['google',  'email'],
+        default: 'email'
+    },
+},
+    {
+        timestamps: true
+    }
 );
 
 const User = mongoose.model("User", userSchema);

@@ -2,58 +2,74 @@ import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import http from "http";
-import connectDB from "./db/index.js";
+import https from "https";
 import cors from "cors";
+
+// Import your modules
+import connectDB from "./db/index.js";
+import connectSocket from "./lib/socketio.js";
+
+// Import your route handlers
 import stocksRoutes from "./routes/stocksRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
-import connectSocket from "./lib/socketio.js";
-import stockRoutes from "./routes/stockRoutes.js";
+import stockRoutes from "./routes/stockRoutes.js"; // Make sure this isn't a typo for 'stocksRoutes'
 import transactionRoutes from "./routes/transactionRoutes.js";
 import portfolioRoutes from "./routes/portfolioRoutes.js";
 import strategyRoutes from "./routes/strategyRoutes.js";
-import https from "https";
 
 const PORT = process.env.PORT || 3000;
 const app = express();
-connectDB();
-app.use(express.json());
-app.use(cors());
-app.use("/api/stocks", stocksRoutes);
-app.use("/api", orderRoutes);
-app.use("/api/v1", authRoutes);
 
-app.get("/", (req, res) => {
-  res.send(`<h1>this is server</h1>`);
+// 1. Connect to Database
+connectDB();
+
+// 2. Apply ALL general middleware BEFORE routes
+app.use(cors());
+app.use(express.json());
+
+// Your Cross-Origin headers should be here
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
 });
 
-// Mount stock routes
-app.use("/api/stocks", stockRoutes);
+// 3. Define ALL your API routes
+app.get("/", (req, res) => {
+  res.send(`<h1>This is the server</h1>`);
+});
 
-// Error handling middleware
+app.use("/api/v1", authRoutes); // Use only once
+app.use("/api/stocks", stocksRoutes);
+app.use("/api/stock-details", stockRoutes); // Renamed to avoid conflict. Adjust as needed.
+app.use("/api/orders", orderRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/strategy", strategyRoutes);
+
+// 4. Place the Error Handling Middleware at the VERY END
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Something broke!" });
+  res.status(500).json({ message: "Something went wrong on the server!" });
 });
-app.use("/api/v1", authRoutes);
-app.use("/api/transactions", transactionRoutes);
-app.use("/api", portfolioRoutes);
-app.use("/api", strategyRoutes);
 
+// 5. Create Server and Connect Socket.IO
 const server = http.createServer(app);
-
 await connectSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
+// 6. Keep-alive ping for your deployed server (This part is correct!)
 setInterval(() => {
+  console.log("Pinging server to keep it alive...");
   https
     .get(`https://trade-shala-yr1j.onrender.com`, (res) => {
-      console.log("Pinging server to keep alive");
+      console.log(`Ping successful with status code: ${res.statusCode}`);
     })
     .on("error", (err) => {
       console.error("Error pinging server: ", err.message);
     });
-}, 10 * 60 * 1000);
+}, 10 * 60 * 1000); // Pings every 10 minutes

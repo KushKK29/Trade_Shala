@@ -5,8 +5,10 @@ export const createStrategy = async (req, res) => {
     try {
         const strategy = new Strategy(req.body);
         await strategy.save();
+        console.log("strategy", strategy);
         res.status(201).json({ message: 'Strategy uploaded successfully', strategy });
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: 'Error uploading strategy', error });
     }
 };
