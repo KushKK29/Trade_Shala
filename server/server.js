@@ -5,7 +5,7 @@ import express from "express";
 import http from "http";
 import connectDB from "./db/index.js";
 import cors from "cors";
-import sitemapRoutes from "./routes/sitemap.js";
+
 import stocksRoutes from "./routes/stocksRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -20,7 +20,7 @@ import https from "https";
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-app.use("/", sitemapRoutes);
+
 connectDB();
 
 app.use(express.json());
