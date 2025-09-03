@@ -1,10 +1,7 @@
-import express from "express";
 import fs from "fs";
 import path from "path";
 import csvParser from "csv-parser";
 import { format } from "date-fns";
-
-const router = express.Router();
 
 // ✅ Static pages
 const staticRoutes = [
@@ -17,9 +14,9 @@ const staticRoutes = [
   "/profile",
 ];
 
-// ✅ Function to load stock symbols & company names
+// ✅ Load stock symbols & company names
 async function loadStockData() {
-  const csvFilePath = path.join(process.cwd(), "utils", "NSE.csv"); // <-- path to your file
+  const csvFilePath = path.join(process.cwd(), "util", "NSE.csv");
   const stocks = [];
 
   return new Promise((resolve, reject) => {
@@ -28,80 +25,74 @@ async function loadStockData() {
       .on("data", (row) => {
         const symbol = row.tradingsymbol?.trim();
         const companyName = row.name?.trim();
-
-        if (symbol || companyName) {
-          stocks.push({ symbol, companyName });
-        }
+        if (symbol || companyName) stocks.push({ symbol, companyName });
       })
       .on("end", () => resolve(stocks))
-      .on("error", (err) => reject(err));
+      .on("error", reject);
   });
 }
 
-router.get("/sitemap.xml", async (req, res) => {
+async function generateSitemap() {
   const baseUrl = "https://trade-shala-inky.vercel.app";
   const today = format(new Date(), "yyyy-MM-dd");
 
-  try {
-    const stocks = await loadStockData();
+  const stocks = await loadStockData();
+  const urls = [];
 
-    let urls = "";
+  // Static
+  staticRoutes.forEach((route) => {
+    urls.push(`
+      <url>
+        <loc>${baseUrl}${route}</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+      </url>
+    `);
+  });
 
-    // Add static routes
-    staticRoutes.forEach((path) => {
-      urls += `
+  // Dynamic
+  stocks.forEach(({ symbol, companyName }) => {
+    if (symbol) {
+      urls.push(`
         <url>
-          <loc>${baseUrl}${path}</loc>
+          <loc>${baseUrl}/stock/${encodeURIComponent(symbol)}</loc>
+          <lastmod>${today}</lastmod>
+          <changefreq>daily</changefreq>
+          <priority>0.9</priority>
+        </url>
+        <url>
+          <loc>${baseUrl}/technical-analysis/${encodeURIComponent(symbol)}</loc>
+          <lastmod>${today}</lastmod>
+          <changefreq>daily</changefreq>
+          <priority>0.7</priority>
+        </url>
+      `);
+    }
+
+    if (companyName) {
+      const safeName = companyName.replace(/\s+/g, "-");
+      urls.push(`
+        <url>
+          <loc>${baseUrl}/company/${encodeURIComponent(safeName)}</loc>
           <lastmod>${today}</lastmod>
           <changefreq>weekly</changefreq>
-          <priority>0.8</priority>
+          <priority>0.7</priority>
         </url>
-      `;
-    });
+      `);
+    }
+  });
 
-    // Add stock/company/technical-analysis routes from CSV
-    stocks.forEach(({ symbol, companyName }) => {
-      if (symbol) {
-        urls += `
-          <url>
-            <loc>${baseUrl}/stock/${encodeURIComponent(symbol)}</loc>
-            <lastmod>${today}</lastmod>
-            <changefreq>daily</changefreq>
-            <priority>0.9</priority>
-          </url>
-          <url>
-            <loc>${baseUrl}/technical-analysis/${encodeURIComponent(symbol)}</loc>
-            <lastmod>${today}</lastmod>
-            <changefreq>daily</changefreq>
-            <priority>0.7</priority>
-          </url>
-        `;
-      }
+  // Final XML
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join("\n")}
+</urlset>`;
 
-      if (companyName) {
-        urls += `
-          <url>
-            <loc>${baseUrl}/company/${encodeURIComponent(companyName.replace(/\s+/g, "-"))}</loc>
-            <lastmod>${today}</lastmod>
-            <changefreq>weekly</changefreq>
-            <priority>0.7</priority>
-          </url>
-        `;
-      }
-    });
+  // ✅ Save into public/sitemap.xml
+  const outputPath = path.join(process.cwd(), "..", "client", "public", "sitemap.xml");
+  fs.writeFileSync(outputPath, xml, "utf8");
+  console.log("✅ Sitemap generated at public/sitemap.xml");
+}
 
-    // Final XML
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        ${urls}
-      </urlset>`;
-
-    res.header("Content-Type", "application/xml");
-    res.send(xml);
-  } catch (err) {
-    console.error("Error generating sitemap:", err);
-    res.status(500).send("Error generating sitemap");
-  }
-});
-
-export default router;
+generateSitemap();

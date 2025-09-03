@@ -12,7 +12,7 @@ Disallow: /profile
 Disallow: /contact
 
 # Sitemap
-Sitemap: https://trade-shala-yr1j.onrender.com/sitemap.xml
+Sitemap: https://trade-shala-inky.vercel.app/sitemap.xml
 
 # Crawl-delay for respectful crawling
 Crawl-delay: 1
