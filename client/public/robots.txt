@@ -1,0 +1,28 @@
+# Global settings
+User-agent: *
+Allow: /
+
+# Disallow auth & private pages
+Disallow: /signup
+Disallow: /login
+Disallow: /login/phone
+Disallow: /login/email
+Disallow: /wallet
+Disallow: /profile
+Disallow: /contact
+
+# Sitemap
+Sitemap: https://trade-shala-yr1j.onrender.com/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Allow all major search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
