@@ -1,98 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-
-  <!-- Main pages -->
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/signup</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/login/phone</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/login/email</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/contact</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/wallet</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/news</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/profile</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/marketplace</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/portfolio-predict</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <!-- Example stock pages -->
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/stock/INFY</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/stock/TCS</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/technical-analysis/TCS</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <!-- Example company profile pages -->
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/company/HDFCBANK</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://trade-shala-inky.vercel.app/company/RELIANCE</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<url>
+  <loc>https://trade-shala-inky.vercel.app/</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>1.00</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/Marketplace</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/News</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/Contact%20Us</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/AI%20Portfolio</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/Login</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://trade-shala-inky.vercel.app/Social</loc>
+  <lastmod>2025-09-07T16:27:00+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
 </urlset>
