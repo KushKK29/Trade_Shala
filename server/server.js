@@ -24,7 +24,43 @@ const app = express();
 connectDB();
 
 app.use(express.json());
-app.use(cors());
+
+// Enhanced CORS configuration for production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    
+    // Allow your production domains
+    const allowedOrigins = [
+      'https://trade-shala-yr1j.onrender.com',
+      'https://trade-shala-inky.vercel.app',
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // For development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Cross-Origin-Resource-Policy']
+};
+
+app.use(cors(corsOptions));
+
 
 app.use("/api/stocks", stocksRoutes);
 app.use("/api", orderRoutes);
@@ -33,7 +69,8 @@ app.use("/api/v1", authRoutes);
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   // You might also need this header for some OAuth flows
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
 });
 
