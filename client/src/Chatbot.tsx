@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { motion } from "framer-motion";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import { Send, Loader, X, Maximize2, Minimize2 } from "lucide-react";
@@ -18,32 +18,21 @@ interface GeminiChatbotProps {
   apiKey: string;
 }
 
-const MAX_TOKENS = 2048; // Token limit for responses
-
-const GeminiChatbot: React.FC<GeminiChatbotProps> = ({ apiKey }) => {
+const GeminiChatbot: React.FC<GeminiChatbotProps> = () => {
+  const apiKey = "AIzaSyDC9KZPk178lSOYC8baYo1wP9ZnxUobI2o";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash-thinking-exp-01-21",
-  });
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const ai = new GoogleGenAI({ apiKey });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const generationConfig = {
-    temperature: 0.7,
-    topP: 0.95,
-    topK: 64,
-    maxOutputTokens: MAX_TOKENS,
-    responseMimeType: "text/plain",
-  };
 
   const sendMessage = async (message: string) => {
     if (!message.trim()) return;
@@ -58,25 +47,65 @@ const GeminiChatbot: React.FC<GeminiChatbotProps> = ({ apiKey }) => {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    try {
-      const chatSession = model.startChat({
-        generationConfig,
-        history: messages.map(({ role, content }) => ({
-          role: role === "user" ? "user" : "model",
-          parts: [{ text: content }],
-        })),
-      });
-      const result = await chatSession.sendMessage(message);
-      const maxOutputLength = 300;
+    // Add placeholder for bot response
+    const botMessagePlaceholder: ChatMessage = {
+      role: "bot",
+      content: "",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, botMessagePlaceholder]);
+    
+    let botText = "";
 
-      const botMessage: ChatMessage = {
-        role: "bot",
-        content: result.response.text().slice(0, maxOutputLength) + "...",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
+    try {
+      // Prepare history
+      const history = messages.map((m) => ({
+        role: m.role === "user" ? "user" : "model",
+        parts: [{ text: m.content }],
+      }));
+
+      const stream = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        config: {
+          maxOutputTokens: 500,
+          temperature: 0.7,
+        },
+        contents: [
+          ...history,
+          {
+            role: "user",
+            parts: [{ text: message + "\n\nPlease provide a helpful answer, summarized in 3-4 lines maximum." }],
+          },
+        ],
+      });
+
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          botText += chunk.text;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            if (updated[lastIndex].role === "bot") {
+              updated[lastIndex] = {
+                ...updated[lastIndex],
+                content: botText
+              };
+            }
+            return updated;
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
       setError(err instanceof Error ? err.message : "An error occurred");
+      // Remove placeholder if failed
+      setMessages((prev) => {
+         const last = prev[prev.length - 1];
+         if (last.role === "bot" && last.content === "") {
+             return prev.slice(0, -1);
+         }
+         return prev;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +191,35 @@ const GeminiChatbot: React.FC<GeminiChatbotProps> = ({ apiKey }) => {
                             : "rounded-tl-sm"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                        <span className="text-xs opacity-70 mt-1 block">
-                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        <p className="whitespace-pre-wrap">
+                          {msg.content === "" && msg.role === "bot" ? (
+                            <div className="flex gap-1 h-6 items-center px-1">
+                              <motion.div
+                                className="w-2 h-2 bg-gray-400 rounded-full"
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
+                              />
+                              <motion.div
+                                className="w-2 h-2 bg-gray-400 rounded-full"
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                              />
+                              <motion.div
+                                className="w-2 h-2 bg-gray-400 rounded-full"
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                              />
+                            </div>
+                          ) : (
+                            msg.content
+                          )}
+                        </p>
+                        <span className="text-xs opacity-70 mt-2 block w-full text-right">
+                          {new Date(msg.timestamp).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          }).toLowerCase()}
                         </span>
                       </div>
                     </motion.div>

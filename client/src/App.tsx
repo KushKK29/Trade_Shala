@@ -42,7 +42,7 @@ function App() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/portfolio-predict" element={<PortfolioPredict />} />
         </Routes>
-        <GeminiChatbot apiKey="AIzaSyBvX1pXSK0h3ZANvyzeyNsje9FHSHFXp2U" />
+        <GeminiChatbot apiKey="AIzaSyC-ysClLQJhaqLG9ApClrHcEV7L1po43_E" />
         <Footer />
       </Router>
       {/* <TradingWidgets></TradingWidgets> */}
