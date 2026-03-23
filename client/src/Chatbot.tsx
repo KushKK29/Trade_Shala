@@ -19,7 +19,7 @@ interface GeminiChatbotProps {
 }
 
 const GeminiChatbot: React.FC<GeminiChatbotProps> = () => {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY!;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
