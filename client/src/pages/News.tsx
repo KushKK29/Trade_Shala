@@ -76,23 +76,23 @@ const News = () => {
     setAnalyzing(true);
     setSentiment(null);
     try {
-      const client = await Client.connect("dami1996/trading-analyst");
-
-      const result = (await client.predict("/analyze_asset_sentiment", [
+      const client = await Client.connect("Kush27/news-based-stock-analyser");
+      console.log(client)
+      const result: any = (await client.predict("/analyze_asset_sentiment", [
         symbol,
       ])) as NewsData; // Type assertion for result
-
+      console.log(result)
       // Parse the response data
       const newsData = result.data[0].data;
-
+      console.log(newsData)
       // Count sentiments for signal
       const sentiments = newsData.map((item: string[]) =>
         item[0].toLowerCase()
       );
-      const positiveCount = sentiments.filter((s) =>
+      const positiveCount = sentiments.filter((s: string) =>
         s.includes("positive")
       ).length;
-      const negativeCount = sentiments.filter((s) =>
+      const negativeCount = sentiments.filter((s: string) =>
         s.includes("negative")
       ).length;
 
@@ -100,8 +100,8 @@ const News = () => {
         positiveCount > negativeCount
           ? "BUY"
           : negativeCount > positiveCount
-          ? "SELL"
-          : "NEUTRAL";
+            ? "SELL"
+            : "NEUTRAL";
 
       setSentiment({
         signal,
