@@ -6,7 +6,6 @@ import {
   FaSearch,
   FaTimes,
 } from "react-icons/fa";
-import { Client } from "@gradio/client";
 
 interface NewsItem {
   category: string;
@@ -75,39 +74,45 @@ const News = () => {
   const analyzeSentiment = async (symbol: string) => {
     setAnalyzing(true);
     setSentiment(null);
+    const BASE = "https://kush27-news-based-stock-analyser.hf.space/gradio_api";
     try {
-      const client = await Client.connect("Kush27/news-based-stock-analyser");
-      console.log(client)
-      const result: any = (await client.predict("/analyze_asset_sentiment", [
-        symbol,
-      ])) as NewsData; // Type assertion for result
-      console.log(result)
-      // Parse the response data
-      const newsData = result.data[0].data;
-      console.log(newsData)
+      // Step 1: POST to start prediction, get event_id
+      const postRes = await fetch(`${BASE}/call/analyze_asset_sentiment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [symbol] }),
+      });
+      const { event_id } = await postRes.json();
+
+      // Step 2: GET the SSE stream for the result
+      const sseRes = await fetch(`${BASE}/call/analyze_asset_sentiment/${event_id}`);
+      const text = await sseRes.text();
+
+      // Parse the SSE text — find the 'complete' event data line
+      const lines = text.split("\n");
+      let resultData: any = null;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("event: complete") && lines[i + 1]?.startsWith("data: ")) {
+          resultData = JSON.parse(lines[i + 1].slice(6));
+          break;
+        }
+      }
+
+      if (!resultData) throw new Error("No result received from the AI Space.");
+
+      const newsData = resultData[0]?.data;
+      if (!newsData) throw new Error("Unexpected response format.");
+
       // Count sentiments for signal
-      const sentiments = newsData.map((item: string[]) =>
-        item[0].toLowerCase()
-      );
-      const positiveCount = sentiments.filter((s: string) =>
-        s.includes("positive")
-      ).length;
-      const negativeCount = sentiments.filter((s: string) =>
-        s.includes("negative")
-      ).length;
+      const sentiments = newsData.map((item: string[]) => item[0].toLowerCase());
+      const positiveCount = sentiments.filter((s: string) => s.includes("positive")).length;
+      const negativeCount = sentiments.filter((s: string) => s.includes("negative")).length;
 
       const signal =
-        positiveCount > negativeCount
-          ? "BUY"
-          : negativeCount > positiveCount
-            ? "SELL"
-            : "NEUTRAL";
+        positiveCount > negativeCount ? "BUY" :
+        negativeCount > positiveCount ? "SELL" : "NEUTRAL";
 
-      setSentiment({
-        signal,
-        analysis: newsData,
-        newsCount: newsData.length,
-      });
+      setSentiment({ signal, analysis: newsData, newsCount: newsData.length });
     } catch (err: any) {
       console.error("Error analyzing:", err);
       setError(
@@ -210,11 +215,20 @@ const News = () => {
                   <tbody className="divide-y divide-gray-700">
                     {sentiment.analysis.map((item: any[], index: number) => {
                       const [sentimentText, title, description, date] = item;
-                      const cleanSentiment = sentimentText.replace(
-                        /<[^>]*>/g,
-                        ""
-                      );
-                      const cleanTitle = title.replace(/<[^>]*>/g, "");
+
+                      // Strip HTML from sentiment badge
+                      const cleanSentiment = sentimentText.replace(/<[^>]*>/g, "");
+
+                      // Extract href and text from the <a> tag Gradio returns
+                      const titleMatch = title.match(/href="([^"]+)"[^>]*>([^<]+)/);
+                      const articleUrl = titleMatch ? titleMatch[1] : "";
+                      const articleTitle = titleMatch ? titleMatch[2] : title.replace(/<[^>]*>/g, "");
+
+                      // Strip HTML tags and entities from description
+                      const cleanDescription = description
+                        .replace(/<[^>]*>/g, "")
+                        .replace(/&nbsp;/g, " ")
+                        .trim();
 
                       return (
                         <tr key={index} className="hover:bg-gray-800/50">
@@ -228,13 +242,22 @@ const News = () => {
                             </span>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-white">
-                              {cleanTitle}
-                            </div>
+                            {articleUrl ? (
+                              <a
+                                href={articleUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-white hover:text-green-400 hover:underline transition-colors"
+                              >
+                                {articleTitle}
+                              </a>
+                            ) : (
+                              <div className="text-sm text-white">{articleTitle}</div>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div className="text-sm text-gray-400">
-                              {description}
+                              {cleanDescription}
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
