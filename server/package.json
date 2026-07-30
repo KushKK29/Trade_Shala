@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "nodemon server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -33,5 +34,8 @@
     "socket.io": "^4.8.1",
     "twilio": "^5.4.3",
     "upstox-js-sdk": "^2.13.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.2"
   }
 }
