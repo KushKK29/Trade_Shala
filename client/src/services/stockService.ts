@@ -78,9 +78,13 @@ export const deleteStrategy = async (id: string) => {
   }
 };
 
+const authHeaders = () => ({
+  headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+});
+
 export const fetchUserById = async (user_id: string) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/v1/user/${user_id}`);
+    const response = await axios.get(`${API_BASE_URL}/v1/user/${user_id}`, authHeaders());
     return response;
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -92,7 +96,8 @@ export const depositFunds = async (user_id: string, amount: number) => {
   try {
     const response = await axios.post(
       `${API_BASE_URL}/v1/user/${user_id}/deposit`,
-      { amount }
+      { amount },
+      authHeaders()
     );
     return response;
   } catch (error) {
