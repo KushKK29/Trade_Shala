@@ -45,10 +45,16 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
       resetForm();
     };
 
+    const handleError = (error: any) => {
+      toast.error(typeof error === "string" ? error : error?.message || "Failed to place order.");
+    };
+
     socket.on("orderPlaced", handleOrderPlaced);
+    socket.on("error", handleError);
 
     return () => {
       socket.off("orderPlaced", handleOrderPlaced);
+      socket.off("error", handleError);
     };
   }, [onTradeComplete]);
 
@@ -61,6 +67,11 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
 
     if (quantity <= 0) {
       toast.error("Quantity must be greater than 0.");
+      return;
+    }
+
+    if (!currentPrice || currentPrice <= 0) {
+      toast.error("No live price available for this stock yet. Please wait for the market data to load.");
       return;
     }
 
