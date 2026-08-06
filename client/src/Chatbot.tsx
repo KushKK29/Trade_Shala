@@ -18,8 +18,8 @@ interface GeminiChatbotProps {
   apiKey: string;
 }
 
-const GeminiChatbot: React.FC<GeminiChatbotProps> = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const GeminiChatbot: React.FC<GeminiChatbotProps> = ({ apiKey: propApiKey }) => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || propApiKey;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -28,14 +28,17 @@ const GeminiChatbot: React.FC<GeminiChatbotProps> = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const ai = new GoogleGenAI({ apiKey });
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = async (message: string) => {
     if (!message.trim()) return;
+
+    if (!apiKey) {
+      setError("Chatbot is not configured (missing API key).");
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -58,6 +61,7 @@ const GeminiChatbot: React.FC<GeminiChatbotProps> = () => {
     let botText = "";
 
     try {
+      const ai = new GoogleGenAI({ apiKey });
       // Prepare history
       const history = messages.map((m) => ({
         role: m.role === "user" ? "user" : "model",

@@ -410,27 +410,35 @@ function Stock() {
 
   useEffect(() => {
     fetchPositions();
+
+    const handleOrderCompleted = (response: any) => {
+      toast.success(response.message || "Position closed successfully!");
+      fetchPositions();
+    };
+
+    socket.on("orderCompleted", handleOrderCompleted);
+
+    return () => {
+      socket.off("orderCompleted", handleOrderCompleted);
+    };
   }, [stockName]);
 
   const handleClosePosition = (position: any) => {
-    console.log(position);
+    const userId = localStorage.getItem("user_id");
+    if (!userId) {
+      toast.error("Please log in to manage positions.");
+      return;
+    }
+
     const orderData = {
       stock_symbol: stockName,
       trade_type: position.tradeType,
       quantity: position.quantity,
       completion_price: currentPrice,
-      user_id: localStorage.getItem("user_id"),
+      user_id: userId,
     };
 
     socket.emit("completeOrder", orderData);
-
-    socket.on("completeOrder", (response) => {
-      alert(response.message);
-    });
-
-    socket.on("error", (error) => {
-      alert(error);
-    });
   };
 
   if (isLoading) {

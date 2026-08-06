@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
     },
     virtualBalance: {
         type: Number,
-        default: 0
+        default: 100000
     },
     provider: {
         type: String,

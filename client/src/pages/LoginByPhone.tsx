@@ -1,55 +1,26 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import I1 from "../assets/loginn.jpeg";
 import { FaGoogle } from "react-icons/fa";
-import { generateOTP, loginByPhone } from "../services/authService";
+import { loginByPhone } from "../services/authService";
 import { toast } from "sonner";
 import { account, OAuthProvider } from "../components/appwrite";
+
 function LoginByPhone() {
-  const [showOTP, setShowOTP] = useState(false);
   const navigate = useNavigate();
-
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [timer, setTimer] = useState(60);
-  const [isResendDisabled, setIsResendDisabled] = useState(true);
-
-  const handleSendOTP = async () => {
-    if (phoneNumber.length !== 10) {
-      toast.error("Please enter a valid 10-digit phone number.");
-      return;
-    }
-    try {
-      await generateOTP({ phoneNumber: `+91${phoneNumber}` });
-
-      setShowOTP(true);
-      setIsResendDisabled(true);
-      setTimer(60);
-      toast.success("OTP sent successfully!");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to send OTP.");
-    }
-  };
-
-  const handleResendOTP = () => {
-    if (!isResendDisabled) {
-      handleSendOTP();
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!showOTP) {
-      handleSendOTP();
+    if (phoneNumber.length !== 10) {
+      toast.error("Please enter a valid 10-digit phone number.");
       return;
     }
 
     try {
       const response = await loginByPhone({
         phoneNumber: `+91${phoneNumber}`,
-        otp,
       });
-      console.log(response);
       if (response.status === 200) {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user_id", response.data.user?._id);
@@ -64,26 +35,14 @@ function LoginByPhone() {
   const handleGoogleSignIn = async () => {
     try {
       await account.createOAuth2Session(
-        OAuthProvider.Google, // Use enum instead of string
-        "https://trade-shala.vercel.app/", // Success Redirect URI
-        "https://trade-shala.vercel.app/login/phone" // Failure Redirect URI
+        OAuthProvider.Google,
+        "https://trade-shala.vercel.app/",
+        "https://trade-shala.vercel.app/login/phone"
       );
     } catch (error) {
       console.error("Google Sign-In Error:", error);
     }
   };
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (showOTP && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0) {
-      setIsResendDisabled(false);
-    }
-    return () => clearInterval(interval);
-  }, [showOTP, timer]);
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center z-50">
@@ -110,62 +69,24 @@ function LoginByPhone() {
               <label className="text-sm text-gray-600 mb-1 block">
                 Phone Number
               </label>
-              <div className="flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+              <div className="flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white">
                 <span className="px-3 text-gray-700">+91</span>
                 <input
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="Enter your phone number"
-                  className="w-full p-3 outline-none text-white rounded-lg"
+                  className="w-full p-3 outline-none bg-white text-gray-900 placeholder:text-gray-400 rounded-lg"
                   required
                 />
               </div>
             </div>
 
-            {showOTP && (
-              <>
-                <div className="flex space-x-2">
-                  <div className="flex-1">
-                    <label className="text-sm text-gray-600 mb-1 block">
-                      OTP
-                    </label>
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      placeholder="Enter OTP"
-                      className="w-full p-3 border border-gray-300 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  {timer > 0 ? (
-                    <p className="text-gray-600 text-sm">
-                      Resend OTP in {timer} seconds
-                    </p>
-                  ) : null}
-
-                  {timer === 0 && (
-                    <button
-                      type="button"
-                      onClick={handleResendOTP}
-                      className="bg-blue-600 hover:bg-blue-800 w-fit text-[0.8rem] text-white py-2 px-2 rounded-lg transition-colors"
-                    >
-                      Resend OTP
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-
             <button
               type="submit"
               className="w-full bg-blue-700 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors"
             >
-              {showOTP ? "Verify and Login" : "Send OTP"}
+              Login
             </button>
           </form>
 
@@ -183,7 +104,7 @@ function LoginByPhone() {
 
             <button
               onClick={handleGoogleSignIn}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-white text-gray-800 border border-gray-300 p-3 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <FaGoogle />
               Sign in with Google

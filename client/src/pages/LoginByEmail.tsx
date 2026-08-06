@@ -76,7 +76,7 @@ function LoginByEmail() {
                 value={form.email}
                 onChange={handleFormChange}
                 placeholder="Enter your email"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder:text-gray-400"
                 required
               />
             </div>
@@ -91,7 +91,7 @@ function LoginByEmail() {
                 value={form.password}
                 onChange={handleFormChange}
                 placeholder="Enter your password"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder:text-gray-400"
                 required
               />
             </div>

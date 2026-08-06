@@ -8,12 +8,12 @@ const orderSchema = new mongoose.Schema({
     order_type: {
         type: String,
         required: true,
-        enum: ["market", "limit"]
+        enum: ["market", "limit", "sl", "sl-m"]
     },
     order_category: {
         type: String,
         required: true,
-        enum: ["intraday", "delivery"]
+        enum: ["intraday", "delivery", "futures", "options"]
     },
     type: {
         type: String,

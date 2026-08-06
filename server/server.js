@@ -6,6 +6,8 @@ import http from "http";
 import connectDB from "./db/index.js";
 import cors from "cors";
 
+import { corsOptions } from "./util/corsConfig.js";
+
 import stocksRoutes from "./routes/stocksRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -25,50 +27,12 @@ connectDB();
 
 app.use(express.json());
 
-// Enhanced CORS configuration for production
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow localhost for development
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return callback(null, true);
-    }
-    
-    // Allow your production domains
-    const allowedOrigins = [
-      'https://trade-shala-yr1j.onrender.com',
-      'https://trade-shala-inky.vercel.app',
-    ];
-    
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // For development, allow all origins
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Cross-Origin-Resource-Policy']
-};
-
+// Enable CORS
 app.use(cors(corsOptions));
 
-
-app.use("/api/stocks", stocksRoutes);
-app.use("/api", orderRoutes);
-app.use("/api/v1", authRoutes);
-
+// Additional headers
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  // You might also need this header for some OAuth flows
   res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
@@ -78,19 +42,20 @@ app.get("/", (req, res) => {
   res.send(`<h1>this is server</h1>`);
 });
 
-// Mount stock routes
+// API Routes
+app.use("/api/stocks", stocksRoutes);
 app.use("/api/stocks", stockRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Something broke!" });
-});
-
+app.use("/api", orderRoutes);
 app.use("/api/v1", authRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api", portfolioRoutes);
 app.use("/api", strategyRoutes);
+
+// Error handling middleware (must be after all routes)
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: err.message || "Something broke!" });
+});
 
 const server = http.createServer(app);
 

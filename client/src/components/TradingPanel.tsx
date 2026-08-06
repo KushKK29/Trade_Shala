@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTrade } from "../context/context";
 import { io } from "socket.io-client";
 import { SOCKET_BASE_URL } from "@/services/API";
+import { toast } from "sonner";
 
 const socket = io(SOCKET_BASE_URL);
 
@@ -35,10 +36,36 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
   const [strikePrice, setStrikePrice] = useState<number | null>(null);
   const [optionType, setOptionType] = useState<"CALL" | "PUT">("CALL");
 
-  const totalAmount = currentPrice * quantity;
+  const priceToUse = (orderType === "LIMIT" && limitPrice > 0) ? limitPrice : currentPrice;
+  const totalAmount = priceToUse * quantity;
   const margin = tradeType === "INTRADAY" ? totalAmount * 0.2 : totalAmount;
 
+  useEffect(() => {
+    const handleOrderPlaced = (response: any) => {
+      toast.success(response.message || "Order placed successfully!");
+      onTradeComplete(response.order);
+      resetForm();
+    };
+
+    socket.on("orderPlaced", handleOrderPlaced);
+
+    return () => {
+      socket.off("orderPlaced", handleOrderPlaced);
+    };
+  }, [onTradeComplete]);
+
   const handleTrade = (action: "buy" | "sell") => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) {
+      toast.error("Please log in to place an order.");
+      return;
+    }
+
+    if (quantity <= 0) {
+      toast.error("Quantity must be greater than 0.");
+      return;
+    }
+
     const orderData = {
       stock_symbol: symbol,
       order_type: orderType.toLowerCase(),
@@ -47,20 +74,10 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
       quantity,
       execution_price: currentPrice,
       limit_price: orderType === "LIMIT" ? limitPrice : undefined,
-      user_id: localStorage.getItem("user_id"),
+      user_id: userId,
     };
 
     socket.emit("placeOrder", orderData);
-
-    socket.on("orderPlaced", (response) => {
-      alert(response.message);
-      onTradeComplete(response.order);
-      resetForm();
-    });
-
-    socket.on("error", (error) => {
-      alert(error);
-    });
   };
 
   const resetForm = () => {

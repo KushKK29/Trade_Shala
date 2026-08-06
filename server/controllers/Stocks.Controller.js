@@ -25,40 +25,28 @@ export const stockData = async (req, res) => {
     // Get data when market is open
     const data = await fetchUpstoxData(symbol);
 
-    if (marketStatus === "closed") {
-      //  If the market was open and closed on time, show the data of that day.
-      if (data?.data?.candles?.length > 0) {
-        return res
-          .status(200)
-          .json({ data: data.data, type: "closed_intraday", marketStatus });
-      }
-      // Else market didn't open due to holiday or weekday, show last 7 days data.
-      else {
-        // Calculate the date range for the last 7 days
-        const today = new Date();
-        const sevenDaysAgo = new Date(today);
-
-        // Subtract 7 days from today
-        sevenDaysAgo.setDate(today.getDate() - 7);
-
-        const fromDate = formatDate(sevenDaysAgo);
-        const toDate = formatDate(today);
-
-        // Fetch historical data for the date range
-        const historyData = await getLastMarketData({
-          symbol,
-          toDate,
-          fromDate,
-        });
-        return res
-          .status(200)
-          .json({ data: historyData.data, type: "historical", marketStatus });
-      }
-    } else {
-      return res
-        .status(200)
-        .json({ data: data.data, type: "open_intraday", marketStatus });
+    if (data?.data?.candles?.length > 0) {
+      return res.status(200).json({
+        data: data.data,
+        type: marketStatus === "closed" ? "closed_intraday" : "open_intraday",
+        marketStatus,
+      });
     }
+
+    // No intraday candles yet (market just opened, holiday, or weekend):
+    // fall back to the last 7 days so the client never renders price 0.00.
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    const historyData = await getLastMarketData({
+      symbol,
+      toDate: formatDate(today),
+      fromDate: formatDate(sevenDaysAgo),
+    });
+    return res
+      .status(200)
+      .json({ data: historyData.data, type: "historical", marketStatus });
   } catch (error) {
     console.error("Internal server error:", error);
     res.status(500).json({ message: "Internal server error." });

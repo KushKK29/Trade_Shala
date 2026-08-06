@@ -90,10 +90,18 @@ const decodeProfobuf = (buffer) => {
 
 initProtobuf();
 
+import { isOriginAllowed } from "../util/corsConfig.js";
+
 const connectSocket = async (app) => {
   const io = new Server(app, {
     cors: {
-      origin: process.env.CLIENT_DOMAIN,
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) {
+          callback(null, true);
+        } else {
+          callback(null, false);
+        }
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -230,13 +238,26 @@ const connectSocket = async (app) => {
         }
 
         if (order_type === "limit") {
-          if (!limit_price || limit_price <= 0 || isNaN(limit_price) || execution_price > limit_price) {
+          if (!limit_price || limit_price <= 0 || isNaN(limit_price)) {
             socket.emit("error", "Invalid limit price for a limit order.");
             return;
           }
         } else if (order_type === "market" && limit_price) {
-          socket.emit("error", "Limit price should not be provided for market orders.");
-          return;
+          limit_price = undefined;
+        }
+
+        // Auto-initialize balance to 100,000 for paper trading if uninitialized or 0
+        if (!user.virtualBalance || user.virtualBalance <= 0) {
+          user.virtualBalance = 100000;
+        }
+
+        if (type === "buy") {
+          const totalCost = execution_price * quantity;
+          if (user.virtualBalance < totalCost) {
+            socket.emit("error", `Insufficient virtual balance (Current: ₹${user.virtualBalance.toFixed(2)}, Required: ₹${totalCost.toFixed(2)}).`);
+            return;
+          }
+          user.virtualBalance -= totalCost;
         }
 
         const newOrder = new Order({
@@ -267,7 +288,6 @@ const connectSocket = async (app) => {
         } else {
           const stockIndex = portfolio.holdings.findIndex(h => h.stock_symbol === stock_symbol && h.trade_type === type);
           if (stockIndex === -1) {
-            // Add as a new holding if trade_type differs
             portfolio.holdings.push({
               stock_symbol,
               quantity,
@@ -277,20 +297,9 @@ const connectSocket = async (app) => {
           } else {
             const currentHolding = portfolio.holdings[stockIndex];
             const newQuantity = currentHolding.quantity + quantity;
-            const newAvgPrice = ((currentHolding.average_price * currentHolding.quantity) + (execution_price * quantity)) / newQuantity;
-            portfolio.holdings[stockIndex] = { ...currentHolding, quantity: newQuantity, average_price: newAvgPrice, stock_symbol: currentHolding.stock_symbol, trade_type: currentHolding.trade_type };
+            currentHolding.average_price = ((currentHolding.average_price * currentHolding.quantity) + (execution_price * quantity)) / newQuantity;
+            currentHolding.quantity = newQuantity;
           }
-        }
-
-        if (order_category === "buy") {
-          const totalCost = execution_price * quantity;
-          if (user.virtualBalance < totalCost) {
-            socket.emit("error", "Insufficient virtual balance.");
-            return;
-          }
-          user.virtualBalance -= totalCost;
-        } else if (order_category === "sell") {
-          user.virtualBalance += execution_price * quantity;
         }
 
         await portfolio.save();
@@ -300,7 +309,7 @@ const connectSocket = async (app) => {
         console.log("🚀 Order placed successfully:", newOrder);
       } catch (error) {
         console.error("Error placing order:", error);
-        socket.emit("error", "Error placing the order.");
+        socket.emit("error", "Error placing the order: " + (error.message || error));
       }
     });
 
@@ -310,68 +319,53 @@ const connectSocket = async (app) => {
         const { orderId, marketPrice } = data;
         const order = await Order.findById(orderId);
 
-        // Ensure the order is a limit order and check if the price meets the condition
         if (order && order.order_type === "limit") {
           let isFulfilled = false;
 
-          // Buy Order - Fulfilled if market price <= limit price
-          if (
-            order.order_category === "buy" &&
-            marketPrice <= order.limit_price
-          ) {
+          if (order.type === "buy" && marketPrice <= order.limit_price) {
             isFulfilled = true;
           }
 
-          // Sell Order - Fulfilled if market price >= limit price
-          if (
-            order.order_category === "sell" &&
-            marketPrice >= order.limit_price
-          ) {
+          if (order.type === "sell" && marketPrice >= order.limit_price) {
             isFulfilled = true;
           }
 
-          // If the order is fulfilled, update the status and execute the transaction
           if (isFulfilled) {
-            order.order_status = "fulfilled";
+            order.order_status = "executed";
             await order.save();
 
-            // Update the portfolio when the order is fulfilled
-            const portfolio = await Portfolio.findOne({
-              user_id: order.user_id,
-            });
-            const stockIndex = portfolio.stocks.findIndex(
-              (stock) => stock.stock_symbol === order.stock_symbol
-            );
+            const portfolio = await Portfolio.findOne({ user_id: order.user_id });
+            if (portfolio) {
+              const stockIndex = portfolio.holdings.findIndex(
+                (stock) => stock.stock_symbol === order.stock_symbol && stock.trade_type === order.type
+              );
 
-            if (stockIndex !== -1) {
-              // If it's a buy order, increase quantity
-              if (order.order_category === "buy") {
-                portfolio.stocks[stockIndex].quantity += order.quantity;
+              if (stockIndex !== -1) {
+                portfolio.holdings[stockIndex].quantity += order.quantity;
+              } else {
+                portfolio.holdings.push({
+                  stock_symbol: order.stock_symbol,
+                  quantity: order.quantity,
+                  average_price: order.execution_price,
+                  trade_type: order.type,
+                });
               }
-              // If it's a sell order, decrease quantity
-              if (order.order_category === "sell") {
-                portfolio.stocks[stockIndex].quantity -= order.quantity;
-              }
+              await portfolio.save();
             }
 
-            await portfolio.save();
-
-            // Update the user's virtual balance
             const user = await User.findById(order.user_id);
-            if (order.order_category === "buy") {
-              const totalCost = order.execution_price * order.quantity;
-              user.virtualBalance -= totalCost;
-            } else if (order.order_category === "sell") {
-              const totalSaleAmount = order.execution_price * order.quantity;
-              user.virtualBalance += totalSaleAmount;
+            if (user) {
+              if (order.type === "buy") {
+                const totalCost = order.execution_price * order.quantity;
+                if (!user.virtualBalance || user.virtualBalance <= 0) user.virtualBalance = 100000;
+                user.virtualBalance -= totalCost;
+              }
+              await user.save();
             }
 
-            await user.save();
-
-            // Emit order status update
             socket.emit("orderStatusUpdated", {
               orderId: order._id,
-              newStatus: "fulfilled",
+              newStatus: "executed",
             });
           }
         }
@@ -417,7 +411,13 @@ const connectSocket = async (app) => {
         }
 
         stock.quantity -= quantity;
-        user.virtualBalance += completion_price * quantity;
+        if (trade_type === "sell") {
+          // closing a short: settle PnL (no cash moved when the short was opened)
+          user.virtualBalance += (stock.average_price - completion_price) * quantity;
+        } else {
+          // closing a long: return the sale proceeds
+          user.virtualBalance += completion_price * quantity;
+        }
 
         if (stock.quantity === 0) {
           portfolio.holdings.splice(stockIndex, 1);

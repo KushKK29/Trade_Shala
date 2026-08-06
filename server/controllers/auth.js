@@ -8,6 +8,11 @@ import nodemailer from "nodemailer";
 
 configDotenv();
 
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set.");
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+
 // Twilio Configuration
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -95,67 +100,90 @@ const generateEmailOTP = async (req, res) => {
 
 // Signup
 const signup = async (req, res) => {
-  const { name, email, phoneNumber, password } = req.body;
+  try {
+    const { name, email, phoneNumber, password } = req.body;
 
-  if (!name || !email || !phoneNumber || !password) {
-    return res.status(400).json({ message: "All fields are required" });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email, and password are required." });
+    }
+
+    const query = [{ email: email.toLowerCase() }];
+    if (phoneNumber && phoneNumber.trim()) {
+      query.push({ phoneNumber: phoneNumber.trim() });
+    }
+
+    const existingUser = await User.findOne({ $or: query });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists with this email or phone number." });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      phoneNumber: phoneNumber ? phoneNumber.trim() : "",
+      password: hashedPassword,
+      virtualBalance: 100000,
+    });
+
+    res.status(201).json({ message: "User registered successfully", user });
+  } catch (error) {
+    console.error("Signup error:", error);
+    res.status(500).json({ message: error.message || "Failed to register user." });
   }
-
-  const existingUser = await User.findOne({
-    $or: [{ email }, { phoneNumber }],
-  });
-  if (existingUser) {
-    return res.status(400).json({ message: "User already exists" });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    name,
-    email,
-    phoneNumber,
-    password: hashedPassword,
-  });
-
-  res.status(201).json({ message: "User registered successfully", user });
 };
 
 // Login
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required." });
+    }
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(400).json({ message: "User not found" });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ message: "User not found." });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid credentials." });
+    }
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.status(200).json({ message: "Login successful", token, user });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: error.message || "Login failed." });
   }
-
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
-    return res.status(400).json({ message: "Invalid credentials" });
-  }
-
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-
-  res.status(200).json({ message: "Login successful", token, user });
 };
 
-// Verify OTP and login user
+// Verify OTP / Login via Phone
 const verifyAndLogin = async (req, res) => {
-  const { phoneNumber } = req.body;
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required." });
+    }
 
-  const user = await User.findOne({ phoneNumber });
-  if (!user) {
-    return res.status(400).json({ message: "User not found" });
+    const user = await User.findOne({ phoneNumber: phoneNumber.trim() });
+    if (!user) {
+      return res.status(400).json({ message: "User not found with this phone number." });
+    }
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.status(200).json({ message: "Login successful", token, user });
+  } catch (error) {
+    console.error("Phone login error:", error);
+    res.status(500).json({ message: error.message || "Phone login failed." });
   }
-
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-
-  res
-    .status(200)
-    .json({ message: "OTP verified, login successful", token, user });
 };
 
 // get user details
@@ -214,7 +242,7 @@ const googleSignup = async (req, res) => {
       console.log("New user created:", user);
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
     res.status(isNew ? 201 : 200).json({
@@ -248,7 +276,7 @@ const googleLogin = async (req, res) => {
       isNew = true;
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
 
