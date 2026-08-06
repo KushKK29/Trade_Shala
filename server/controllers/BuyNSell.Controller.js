@@ -1,11 +1,11 @@
 import Transaction from "../models/Transactions.Model.js";
-import Portfolio from "../models/IndiPortfolio.Model.js";
+import Portfolio from "../models/Portfolio.Model.js";
 import Order from "../models/Order.Model.js";
 import Stock from "../models/Stock.Schema.js"; // Importing the Stock model
 import User from "../models/User.Model.js";
 
 export const buyStock = async (req, res) => {
-  const { userId, stockId, quantity, pricePerUnit, type, stock_symbol } = req.body;
+  const { userId, stockId, quantity, pricePerUnit, type } = req.body;
 
   try {
     // Get stock details
@@ -41,25 +41,42 @@ export const buyStock = async (req, res) => {
     });
     await transaction.save();
 
-    // Update the user's portfolio
-    let portfolio = await Portfolio.findOne({ userId });
+    // Update the user's portfolio (same holdings-array shape the socket order flow uses)
+    let portfolio = await Portfolio.findOne({ user_id: userId });
     if (!portfolio) {
       portfolio = new Portfolio({
-        userId,
-        balance: quantity,
-        totalValue: totalPrice,
-        updatedAt: new Date(),
+        user_id: userId,
+        holdings: [{
+          stock_symbol: stock.symbol,
+          quantity,
+          average_price: pricePerUnit,
+          trade_type: "buy",
+        }],
       });
     } else {
-      portfolio.balance += quantity;
-      portfolio.totalValue += totalPrice;
-      portfolio.updatedAt = new Date();
+      const stockIndex = portfolio.holdings.findIndex(
+        (h) => h.stock_symbol === stock.symbol && h.trade_type === "buy"
+      );
+      if (stockIndex === -1) {
+        portfolio.holdings.push({
+          stock_symbol: stock.symbol,
+          quantity,
+          average_price: pricePerUnit,
+          trade_type: "buy",
+        });
+      } else {
+        const currentHolding = portfolio.holdings[stockIndex];
+        const newQuantity = currentHolding.quantity + quantity;
+        currentHolding.average_price =
+          ((currentHolding.average_price * currentHolding.quantity) + (pricePerUnit * quantity)) / newQuantity;
+        currentHolding.quantity = newQuantity;
+      }
     }
     await portfolio.save();
 
     // Optionally create an order
     const order = new Order({
-      stock_symbol: stock_symbol,
+      stock_symbol: stock.symbol,
       order_type: "market",
       order_category: "delivery",
       type: "buy",
@@ -90,8 +107,11 @@ export const sellStock = async (req, res) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     // Get the user's portfolio
-    const portfolio = await Portfolio.findOne({ userId });
-    if (!portfolio || portfolio.balance < quantity) {
+    const portfolio = await Portfolio.findOne({ user_id: userId });
+    const stockIndex = portfolio?.holdings.findIndex(
+      (h) => h.stock_symbol === stock.symbol && h.trade_type === "buy"
+    );
+    if (!portfolio || stockIndex === -1 || portfolio.holdings[stockIndex].quantity < quantity) {
       return res.status(400).json({ message: "Insufficient stock balance" });
     }
 
@@ -116,9 +136,10 @@ export const sellStock = async (req, res) => {
     await transaction.save();
 
     // Update the user's portfolio
-    portfolio.balance -= quantity;
-    portfolio.totalValue -= totalPrice;
-    portfolio.updatedAt = new Date();
+    portfolio.holdings[stockIndex].quantity -= quantity;
+    if (portfolio.holdings[stockIndex].quantity === 0) {
+      portfolio.holdings.splice(stockIndex, 1);
+    }
     await portfolio.save();
 
     // Optionally create an order

@@ -35,6 +35,27 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         required: function () { return this.order_type === 'limit'; }
     },
+    trigger_price: {
+        type: Number,
+        required: function () { return this.order_type === 'sl' || this.order_type === 'sl-m'; }
+    },
+    option_type: {
+        type: String,
+        enum: ["CE", "PE"],
+        required: function () { return this.order_category === 'options'; }
+    },
+    strike_price: {
+        type: Number,
+        required: function () { return this.order_category === 'options'; }
+    },
+    expiry_date: {
+        type: Date,
+        required: function () { return this.order_category === 'options'; }
+    },
+    underlying_price_at_entry: {
+        type: Number,
+        required: function () { return this.order_category === 'options'; }
+    },
     completed_time: {
         type: Date
     },

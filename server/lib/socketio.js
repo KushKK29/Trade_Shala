@@ -12,6 +12,20 @@ import { dirname } from "path";
 import Order from "../models/Order.Model.js";
 import Portfolio from "../models/Portfolio.Model.js";
 import User from "../models/User.Model.js";
+import { calculatePremium } from "../util/optionsPricing.js";
+
+// ponytail: in-memory only, cleared on restart / not shared across
+// processes. Good enough for a single-instance paper-trading server;
+// upgrade to a shared cache (Redis) if this ever runs multi-instance.
+const lastKnownPrice = new Map(); // stock_symbol -> latest price
+
+const MARGIN_MULTIPLIER = {
+  delivery: 1,
+  intraday: 0.2,
+  futures: 0.15,
+  options_buy: 1,
+  options_sell: 0.2,
+};
 
 // Initialize global variables
 let protobufRoot = null;
@@ -171,6 +185,12 @@ const connectSocket = async (app) => {
             const messageHandler = (data) => {
               const decodedData = decodeProfobuf(data);
               // console.log('🚀 decodedData:', decodedData);
+              const feed = decodedData?.feeds?.[instrumentKey];
+              const ohlc = feed?.ff?.marketFF?.marketOHLC?.ohlc;
+              const dailyClose = ohlc?.find((c) => c.interval === "1d")?.close;
+              if (dailyClose) {
+                lastKnownPrice.set(symbol, parseFloat(dailyClose));
+              }
               socket.emit("symbolData", decodedData);
             };
             ws.on("message", messageHandler);
@@ -210,7 +230,7 @@ const connectSocket = async (app) => {
     // Handle order placement event
     socket.on("placeOrder", async (orderDetails) => {
       try {
-        const {
+        let {
           stock_symbol,
           order_type,
           order_category,
@@ -218,7 +238,11 @@ const connectSocket = async (app) => {
           quantity,
           execution_price,
           limit_price,
+          trigger_price,
           user_id,
+          option_type,
+          strike_price,
+          expiry_date,
         } = orderDetails;
 
         if (!stock_symbol || !order_type || !order_category || !type || !quantity || !execution_price || !user_id) {
@@ -246,13 +270,45 @@ const connectSocket = async (app) => {
           limit_price = undefined;
         }
 
-        // Auto-initialize balance to 100,000 for paper trading if uninitialized or 0
-        if (!user.virtualBalance || user.virtualBalance <= 0) {
-          user.virtualBalance = 100000;
+        if (order_type === "sl" || order_type === "sl-m") {
+          if (!trigger_price || trigger_price <= 0 || isNaN(trigger_price)) {
+            socket.emit("error", "Invalid trigger price for a stop-loss order.");
+            return;
+          }
         }
 
+        // Never trust the client-supplied price for a market order; prefer
+        // the server's own last known tick for this symbol when available.
+        if (order_type === "market" && lastKnownPrice.has(stock_symbol)) {
+          execution_price = lastKnownPrice.get(stock_symbol);
+        }
+
+        let underlying_price_at_entry;
+        if (order_category === "options") {
+          if (!option_type || !strike_price || strike_price <= 0 || !expiry_date) {
+            socket.emit("error", "Option type, strike price, and expiry date are required for options orders.");
+            return;
+          }
+          if (new Date(expiry_date) <= new Date()) {
+            socket.emit("error", "Expiry date must be in the future.");
+            return;
+          }
+
+          underlying_price_at_entry = lastKnownPrice.get(stock_symbol) ?? execution_price;
+          execution_price = calculatePremium({
+            spotPrice: underlying_price_at_entry,
+            strikePrice: strike_price,
+            expiryDate: expiry_date,
+            optionType: option_type,
+          });
+        }
+
+        const marginKey =
+          order_category === "options" ? `options_${type === "sell" ? "sell" : "buy"}` : order_category;
+        const marginMultiplier = MARGIN_MULTIPLIER[marginKey] ?? 1;
+        const totalCost = execution_price * quantity * marginMultiplier;
+
         if (type === "buy") {
-          const totalCost = execution_price * quantity;
           if (user.virtualBalance < totalCost) {
             socket.emit("error", `Insufficient virtual balance (Current: ₹${user.virtualBalance.toFixed(2)}, Required: ₹${totalCost.toFixed(2)}).`);
             return;
@@ -268,32 +324,42 @@ const connectSocket = async (app) => {
           quantity,
           execution_price,
           limit_price: order_type === "limit" ? limit_price : undefined,
+          trigger_price: (order_type === "sl" || order_type === "sl-m") ? trigger_price : undefined,
           user_id,
-          order_status: order_type === "limit" ? "pending" : "executed",
+          order_status: order_type === "limit" || order_type === "sl" || order_type === "sl-m" ? "pending" : "executed",
+          option_type: order_category === "options" ? option_type : undefined,
+          strike_price: order_category === "options" ? strike_price : undefined,
+          expiry_date: order_category === "options" ? expiry_date : undefined,
+          underlying_price_at_entry: order_category === "options" ? underlying_price_at_entry : undefined,
         });
 
         await newOrder.save();
 
         let portfolio = await Portfolio.findOne({ user_id });
+        const holdingMatches = (h) =>
+          h.stock_symbol === stock_symbol &&
+          h.trade_type === type &&
+          h.option_type === (order_category === "options" ? option_type : undefined) &&
+          h.strike_price === (order_category === "options" ? strike_price : undefined) &&
+          (order_category !== "options" ||
+            new Date(h.expiry_date).getTime() === new Date(expiry_date).getTime());
+
+        const newHolding = {
+          stock_symbol,
+          quantity,
+          average_price: execution_price,
+          trade_type: type,
+          option_type: order_category === "options" ? option_type : undefined,
+          strike_price: order_category === "options" ? strike_price : undefined,
+          expiry_date: order_category === "options" ? expiry_date : undefined,
+        };
+
         if (!portfolio) {
-          portfolio = new Portfolio({
-            user_id,
-            holdings: [{
-              stock_symbol,
-              quantity,
-              average_price: execution_price,
-              trade_type: type,
-            }],
-          });
+          portfolio = new Portfolio({ user_id, holdings: [newHolding] });
         } else {
-          const stockIndex = portfolio.holdings.findIndex(h => h.stock_symbol === stock_symbol && h.trade_type === type);
+          const stockIndex = portfolio.holdings.findIndex(holdingMatches);
           if (stockIndex === -1) {
-            portfolio.holdings.push({
-              stock_symbol,
-              quantity,
-              average_price: execution_price,
-              trade_type: type,
-            });
+            portfolio.holdings.push(newHolding);
           } else {
             const currentHolding = portfolio.holdings[stockIndex];
             const newQuantity = currentHolding.quantity + quantity;
@@ -313,61 +379,87 @@ const connectSocket = async (app) => {
       }
     });
 
-    // Handle price reached limit
+    // Handle price reached limit (resting limit orders) or stop-loss trigger
+    // (an SL order closes an existing position rather than opening one).
     socket.on("priceReachedLimit", async (data) => {
       try {
         const { orderId, marketPrice } = data;
         const order = await Order.findById(orderId);
+        if (!order || order.order_status !== "pending") return;
 
-        if (order && order.order_type === "limit") {
-          let isFulfilled = false;
+        if (order.order_type === "limit") {
+          const isFulfilled =
+            (order.type === "buy" && marketPrice <= order.limit_price) ||
+            (order.type === "sell" && marketPrice >= order.limit_price);
+          if (!isFulfilled) return;
 
-          if (order.type === "buy" && marketPrice <= order.limit_price) {
-            isFulfilled = true;
-          }
+          order.order_status = "executed";
+          await order.save();
 
-          if (order.type === "sell" && marketPrice >= order.limit_price) {
-            isFulfilled = true;
-          }
+          const portfolio = await Portfolio.findOne({ user_id: order.user_id });
+          if (portfolio) {
+            const stockIndex = portfolio.holdings.findIndex(
+              (stock) => stock.stock_symbol === order.stock_symbol && stock.trade_type === order.type
+            );
 
-          if (isFulfilled) {
-            order.order_status = "executed";
-            await order.save();
-
-            const portfolio = await Portfolio.findOne({ user_id: order.user_id });
-            if (portfolio) {
-              const stockIndex = portfolio.holdings.findIndex(
-                (stock) => stock.stock_symbol === order.stock_symbol && stock.trade_type === order.type
-              );
-
-              if (stockIndex !== -1) {
-                portfolio.holdings[stockIndex].quantity += order.quantity;
-              } else {
-                portfolio.holdings.push({
-                  stock_symbol: order.stock_symbol,
-                  quantity: order.quantity,
-                  average_price: order.execution_price,
-                  trade_type: order.type,
-                });
-              }
-              await portfolio.save();
+            if (stockIndex !== -1) {
+              portfolio.holdings[stockIndex].quantity += order.quantity;
+            } else {
+              portfolio.holdings.push({
+                stock_symbol: order.stock_symbol,
+                quantity: order.quantity,
+                average_price: order.execution_price,
+                trade_type: order.type,
+              });
             }
-
-            const user = await User.findById(order.user_id);
-            if (user) {
-              if (order.type === "buy") {
-                const totalCost = order.execution_price * order.quantity;
-                if (!user.virtualBalance || user.virtualBalance <= 0) user.virtualBalance = 100000;
-                user.virtualBalance -= totalCost;
-              }
-              await user.save();
-            }
-
-            socket.emit("orderStatusUpdated", {
-              orderId: order._id,
-              newStatus: "executed",
-            });
+            await portfolio.save();
           }
+
+          const user = await User.findById(order.user_id);
+          if (user) {
+            if (order.type === "buy") {
+              user.virtualBalance -= order.execution_price * order.quantity;
+            }
+            await user.save();
+          }
+
+          socket.emit("orderStatusUpdated", { orderId: order._id, newStatus: "executed" });
+        } else if (order.order_type === "sl" || order.order_type === "sl-m") {
+          const isTriggered =
+            (order.type === "buy" && marketPrice <= order.trigger_price) ||
+            (order.type === "sell" && marketPrice >= order.trigger_price);
+          if (!isTriggered) return;
+
+          const portfolio = await Portfolio.findOne({ user_id: order.user_id });
+          const stockIndex = portfolio?.holdings.findIndex(
+            (h) => h.stock_symbol === order.stock_symbol && h.trade_type === order.type
+          );
+          if (!portfolio || stockIndex === -1 || stockIndex === undefined) return;
+
+          const holding = portfolio.holdings[stockIndex];
+          const closeQuantity = Math.min(holding.quantity, order.quantity);
+
+          const user = await User.findById(order.user_id);
+          if (!user) return;
+
+          if (order.type === "sell") {
+            user.virtualBalance += (holding.average_price - marketPrice) * closeQuantity;
+          } else {
+            user.virtualBalance += marketPrice * closeQuantity;
+          }
+
+          holding.quantity -= closeQuantity;
+          if (holding.quantity === 0) portfolio.holdings.splice(stockIndex, 1);
+
+          order.order_status = "completed";
+          order.completion_price = marketPrice;
+          order.completed_time = new Date();
+
+          await portfolio.save();
+          await user.save();
+          await order.save();
+
+          socket.emit("orderStatusUpdated", { orderId: order._id, newStatus: "completed" });
         }
       } catch (error) {
         socket.emit("error", "Error updating order status.");
@@ -395,8 +487,6 @@ const connectSocket = async (app) => {
           return;
         }
 
-        console.log(trade_type)
-
         const stockIndex = portfolio.holdings.findIndex((stock) => stock.stock_symbol === stock_symbol && stock.trade_type === trade_type);
         if (stockIndex === -1) {
           socket.emit("error", "Stock not found in portfolio.");
@@ -411,7 +501,19 @@ const connectSocket = async (app) => {
         }
 
         stock.quantity -= quantity;
-        if (trade_type === "sell") {
+
+        if (stock.option_type) {
+          // completion_price is the underlying spot at close time; reprice
+          // the option premium at that spot before settling, so the payout
+          // reflects the option's actual resale value, not a raw stock delta.
+          const exitPremium = calculatePremium({
+            spotPrice: completion_price,
+            strikePrice: stock.strike_price,
+            expiryDate: stock.expiry_date,
+            optionType: stock.option_type,
+          });
+          user.virtualBalance += exitPremium * quantity;
+        } else if (trade_type === "sell") {
           // closing a short: settle PnL (no cash moved when the short was opened)
           user.virtualBalance += (stock.average_price - completion_price) * quantity;
         } else {

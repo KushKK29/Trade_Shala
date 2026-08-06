@@ -28,8 +28,6 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
   const [quantity, setQuantity] = useState<number>(1);
   const [limitPrice, setLimitPrice] = useState<number>(currentPrice);
   const [stopLoss, setStopLoss] = useState<number | null>(null);
-  const [target, setTarget] = useState<number | null>(null);
-  const [triggerPrice, setTriggerPrice] = useState<number | null>(null);
 
   // For F&O
   const [expiryDate, setExpiryDate] = useState<string>("");
@@ -66,14 +64,30 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
       return;
     }
 
+    if (tradeType === "OPTIONS" && (!expiryDate || !strikePrice || strikePrice <= 0)) {
+      toast.error("Expiry date and strike price are required for options.");
+      return;
+    }
+
+    if (stopLoss && stopLoss <= 0) {
+      toast.error("Stop loss must be a positive price.");
+      return;
+    }
+
+    const effectiveOrderType = stopLoss ? "sl" : orderType.toLowerCase();
+
     const orderData = {
       stock_symbol: symbol,
-      order_type: orderType.toLowerCase(),
+      order_type: effectiveOrderType,
       order_category: tradeType.toLowerCase(),
       type: action,
       quantity,
       execution_price: currentPrice,
       limit_price: orderType === "LIMIT" ? limitPrice : undefined,
+      trigger_price: stopLoss || undefined,
+      option_type: tradeType === "OPTIONS" ? (optionType === "CALL" ? "CE" : "PE") : undefined,
+      strike_price: tradeType === "OPTIONS" ? strikePrice : undefined,
+      expiry_date: tradeType === "OPTIONS" ? expiryDate : undefined,
       user_id: userId,
     };
 
@@ -84,8 +98,6 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
     setQuantity(1);
     setLimitPrice(currentPrice);
     setStopLoss(null);
-    setTarget(null);
-    setTriggerPrice(null);
   };
 
   return (
@@ -162,32 +174,18 @@ const TradingPanel: React.FC<TradingPanelProps> = ({
           </div>
         )}
 
-        {/* Stop Loss & Target */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400">
-              Stop Loss
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={stopLoss || ""}
-              onChange={(e) => setStopLoss(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md bg-[#262932] text-white border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-400">
-              Target
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={target || ""}
-              onChange={(e) => setTarget(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md bg-[#262932] text-white border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
+        {/* Stop Loss */}
+        <div>
+          <label className="block text-sm font-medium text-gray-400">
+            Stop Loss (optional)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={stopLoss || ""}
+            onChange={(e) => setStopLoss(Number(e.target.value) || null)}
+            className="mt-1 block w-full rounded-md bg-[#262932] text-white border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
         </div>
 
         {/* F&O Specific Fields */}

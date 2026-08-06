@@ -4,6 +4,15 @@ import { motion } from "framer-motion";
 import { io } from "socket.io-client";
 import dayjs from "dayjs";
 import { SOCKET_BASE_URL } from "@/services/API";
+import { fetchOrders } from "@/services/stockService";
+
+interface PendingSlOrder {
+  _id: string;
+  stock_symbol: string;
+  order_type: "sl" | "sl-m";
+  type: "buy" | "sell";
+  trigger_price: number;
+}
 
 interface Position {
   _id: string;
@@ -33,6 +42,21 @@ const CurrentPositions: React.FC<CurrentPositionsProps> = ({
   const [updatedPrices, setUpdatedPrices] = useState<Record<string, number>>(
     {}
   );
+  const [pendingSlOrders, setPendingSlOrders] = useState<PendingSlOrder[]>([]);
+
+  useEffect(() => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) return;
+
+    fetchOrders(userId)
+      .then((response) => {
+        const slOrders = (response.data?.data || []).filter(
+          (order: any) => order.order_type === "sl" || order.order_type === "sl-m"
+        );
+        setPendingSlOrders(slOrders);
+      })
+      .catch(() => setPendingSlOrders([]));
+  }, [positions]);
 
   useEffect(() => {
     const socket = io(SOCKET_BASE_URL); // WebSocket connection
@@ -51,12 +75,8 @@ const CurrentPositions: React.FC<CurrentPositionsProps> = ({
         const stockKey = Object.keys(newData.feeds || {})[0];
         if (!stockKey) return;
 
-        console.log("Full Data:", newData);
-
         const ohlcData =
           newData.feeds[stockKey]?.ff?.marketFF?.marketOHLC?.ohlc;
-
-        console.log("OHLC Data:", ohlcData);
 
         if (!ohlcData) return;
 
@@ -66,29 +86,30 @@ const CurrentPositions: React.FC<CurrentPositionsProps> = ({
 
         if (filteredData.length === 0) return;
 
-        const transformedData = filteredData.map((data: any) => ({
-          time: dayjs(data.time).format("YYYY-MM-DDTHH:mm:ssZ"),
-          price: parseFloat(data.close),
-        }));
-
-        console.log("Transformed Data:", transformedData);
+        const latestPrice = parseFloat(filteredData[filteredData.length - 1]?.close);
+        if (!latestPrice) return;
 
         // Set updated prices for each stock
         setUpdatedPrices((prev) => ({
           ...prev,
-          [stockKey]:
-            transformedData[transformedData.length - 1]?.price ||
-            prev[stockKey],
+          [stockKey]: latestPrice,
         }));
+
+        pendingSlOrders
+          .filter((order) => order.stock_symbol === stockKey)
+          .forEach((order) => {
+            socket.emit("priceReachedLimit", {
+              orderId: order._id,
+              marketPrice: latestPrice,
+            });
+          });
       }
     });
-
-    console.log(updatedPrices)
 
     return () => {
       socket.disconnect();
     };
-  }, [positions]);
+  }, [positions, pendingSlOrders]);
 
   const handleClosePosition = async (positionId: string) => {
     try {

@@ -23,6 +23,16 @@ const portfolioSchema = new mongoose.Schema({
             trade_type: {
                 type: String,
             },
+            option_type: {
+                type: String,
+                enum: ["CE", "PE"],
+            },
+            strike_price: {
+                type: Number,
+            },
+            expiry_date: {
+                type: Date,
+            },
         }
     ]
 },

@@ -78,6 +78,29 @@ export const deleteStrategy = async (id: string) => {
   }
 };
 
+export const fetchUserById = async (user_id: string) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/v1/user/${user_id}`);
+    return response;
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    throw error;
+  }
+};
+
+export const depositFunds = async (user_id: string, amount: number) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/v1/user/${user_id}/deposit`,
+      { amount }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error depositing funds:", error);
+    throw error;
+  }
+};
+
 export const fetchOrders = async (user_id: string | null) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/order/user/${user_id}`);

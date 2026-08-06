@@ -222,6 +222,61 @@ const getUser = async (req, res) => {
   }
 };
 
+// get user details by id
+const getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userDetail = await User.findById(id).select("-password");
+
+    if (!userDetail) {
+      return res.status(404).json({
+        success: false,
+        message: "No such user exists",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: userDetail,
+      message: "User details fetched",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// deposit virtual funds (paper trading only)
+const depositFunds = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0 || isNaN(amount)) {
+      return res.status(400).json({ message: "Deposit amount must be a positive number." });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.virtualBalance += amount;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Deposit successful",
+      virtualBalance: user.virtualBalance,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const googleSignup = async (req, res) => {
   try {
     const { email, name } = req.body;
@@ -299,6 +354,8 @@ export {
   login,
   verifyAndLogin,
   getUser,
+  getUserById,
+  depositFunds,
   generateEmailOTP,
   googleSignup,
   googleLogin,
